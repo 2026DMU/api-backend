@@ -15,17 +15,14 @@ public class JwtTokenProvider {
     private final SecretKey secretKey;
     private final long tokenValidityInMilliseconds;
 
-
     public JwtTokenProvider(
-            @Value("${jwt.secret:weathercody_default_secret_key_must_be_long_enough}") String secret,
-            @Value("${jwt.token-validity-in-seconds:86400}") long tokenValidityInSeconds) {
-
+            @Value("${jwt.secret}") String secret,
+            @Value("${jwt.token-validity-in-seconds}") long tokenValidityInSeconds) {
 
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.tokenValidityInMilliseconds = tokenValidityInSeconds * 1000;
     }
 
-    // 이메일을 기반으로 JWT 토큰을 생성
     public String createToken(String email) {
         Date now = new Date();
         Date validity = new Date(now.getTime() + this.tokenValidityInMilliseconds);
