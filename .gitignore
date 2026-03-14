@@ -38,5 +38,6 @@ out/
 
 # dotenv
 .env
+.env.dev
 
 .DS_Store
