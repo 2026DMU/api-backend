@@ -22,7 +22,6 @@ public class AuthController {
     public ResponseEntity<String> signup(@RequestBody SignupRequest request) {
         authService.signup(request);
 
-
         String welcomeMessage = String.format(
                 "환영합니다!\n%s 님, 회원가입이 완료되었습니다.\n날씨에 맞는 코디를 추천 받아보세요!",
                 request.getName()

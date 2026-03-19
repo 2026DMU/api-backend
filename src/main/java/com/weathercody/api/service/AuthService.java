@@ -21,6 +21,10 @@ public class AuthService {
 
     @Transactional
     public void signup(SignupRequest request) {
+        if (request.getPassword() == null || request.getPassword().isBlank()) {
+            throw new IllegalArgumentException("비밀번호가 존재하지 않습니다.");
+        }
+
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException("이미 존재하는 이메일입니다.");
         }
@@ -34,7 +38,6 @@ public class AuthService {
                 .heightCm(request.getHeightCm())
                 .weightKg(request.getWeightKg())
                 .footSizeMm(request.getFootSizeMm())
-                .authProvider("EMAIL")
                 .build();
 
         userRepository.save(user);
@@ -42,6 +45,10 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public TokenResponse login(LoginRequest request) {
+        if (request.getPassword() == null || request.getPassword().isBlank()) {
+            throw new IllegalArgumentException("비밀번호가 존재하지 않습니다.");
+        }
+
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("가입되지 않은 이메일입니다."));
 
