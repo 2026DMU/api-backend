@@ -1,0 +1,34 @@
+@baseUrl = http://localhost:8080
+@email = codex-test-{{$timestamp}}@example.com
+@password = TestPass123!
+@phone = 010-{{$timestamp}}
+
+### Swagger UI
+GET {{baseUrl}}/swagger-ui/index.html
+
+### OpenAPI Docs
+GET {{baseUrl}}/v3/api-docs
+
+### Signup
+POST {{baseUrl}}/api/auth/signup
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}",
+  "name": "Codex Test",
+  "gender": "F",
+  "phone": "{{phone}}",
+  "heightCm": 165,
+  "weightKg": 55,
+  "footSizeMm": 240
+}
+
+### Login
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}

@@ -41,3 +41,6 @@ out/
 .env.dev
 
 .DS_Store
+
+# Claude Code
+CLAUDE.md
