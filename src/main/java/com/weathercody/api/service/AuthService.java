@@ -12,6 +12,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.UUID;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -33,7 +35,7 @@ public class AuthService {
     // WARN  AuthService   - 회원가입 실패 - 이미 존재하는 이메일: test@example.com
     // INFO  LoggingFilter - [RESPONSE] 500 | 12ms | body: ...
     @Transactional
-    public void signup(SignupRequest request) {
+    public UUID signup(SignupRequest request) {
         if (request.getPassword() == null || request.getPassword().isBlank()) {
             throw new IllegalArgumentException("비밀번호가 존재하지 않습니다.");
         }
@@ -56,6 +58,8 @@ public class AuthService {
 
         userRepository.save(user);
         log.info("회원가입 성공 - email: {}", request.getEmail());
+
+        return user.getId();
     }
 
     @Transactional(readOnly = true)

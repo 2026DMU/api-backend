@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -20,15 +22,15 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/signup")
-    public ResponseEntity<ApiResponse<String>> signup(@RequestBody SignupRequest request) {
-        authService.signup(request);
+    public ResponseEntity<ApiResponse<UUID>> signup(@RequestBody SignupRequest request) {
+        UUID userId = authService.signup(request);
 
         String welcomeMessage = String.format(
                 "환영합니다! %s 님, 회원가입이 완료되었습니다. 날씨에 맞는 코디를 추천 받아보세요!",
                 request.getName()
         );
 
-        return ResponseEntity.ok(ApiResponse.success(welcomeMessage, 200, "회원가입이 완료되었습니다."));
+        return ResponseEntity.ok(ApiResponse.success(userId, 200, welcomeMessage));
     }
 
     @PostMapping("/login")
