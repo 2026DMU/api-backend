@@ -8,7 +8,13 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "social_accounts")
+@Table(
+        name = "social_accounts",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_social_accounts_user_id", columnNames = "user_id"),
+                @UniqueConstraint(name = "uk_social_accounts_provider_user_id", columnNames = {"provider", "provider_user_id"})
+        }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
@@ -21,8 +27,8 @@ public class SocialAccount {
     @Column(columnDefinition = "UUID", updatable = false, nullable = false)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false, foreignKey = @ForeignKey(name = "fk_user"))
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false, unique = true, foreignKey = @ForeignKey(name = "fk_user"))
     private User user;
 
     @Column(length = 20, nullable = false)

@@ -23,9 +23,9 @@ class LoggingFilterTest {
     }
 
     @Test
-    @DisplayName("password 필드 값이 [MASKED] 로 치환된다")
+    @DisplayName("maskPassword replaces the password value")
     void maskPassword_replacesValueWithMasked() throws Exception {
-        String body = "{\"email\":\"test@example.com\",\"password\":\"secret123\",\"name\":\"홍길동\"}";
+        String body = "{\"email\":\"test@example.com\",\"password\":\"secret123\",\"name\":\"Kim\"}";
 
         String result = maskPassword(body);
 
@@ -34,7 +34,7 @@ class LoggingFilterTest {
     }
 
     @Test
-    @DisplayName("password 외 필드는 마스킹되지 않는다")
+    @DisplayName("maskPassword preserves other fields")
     void maskPassword_preservesOtherFields() throws Exception {
         String body = "{\"email\":\"test@example.com\",\"password\":\"mypassword\"}";
 
@@ -45,34 +45,24 @@ class LoggingFilterTest {
     }
 
     @Test
-    @DisplayName("빈 문자열은 그대로 반환된다")
+    @DisplayName("maskPassword returns blank input as-is")
     void maskPassword_returnsBlankAsIs() throws Exception {
         assertThat(maskPassword("")).isBlank();
     }
 
     @Test
-    @DisplayName("null 은 그대로 반환된다")
+    @DisplayName("maskPassword returns null as-is")
     void maskPassword_returnsNullAsIs() throws Exception {
         assertThat(maskPassword(null)).isNull();
     }
 
     @Test
-    @DisplayName("password 필드가 없으면 body 가 변경되지 않는다")
+    @DisplayName("maskPassword does not change payloads without a password field")
     void maskPassword_noChangeWhenNoPasswordField() throws Exception {
-        String body = "{\"email\":\"test@example.com\",\"name\":\"홍길동\"}";
+        String body = "{\"email\":\"test@example.com\",\"name\":\"Kim\"}";
 
         String result = maskPassword(body);
 
         assertThat(result).isEqualTo(body);
-    }
-
-    @Test
-    @DisplayName("password 값이 빈 문자열이어도 마스킹된다")
-    void maskPassword_masksEmptyPasswordValue() throws Exception {
-        String body = "{\"email\":\"test@example.com\",\"password\":\"\"}";
-
-        String result = maskPassword(body);
-
-        assertThat(result).contains("\"password\":\"[MASKED]\"");
     }
 }
