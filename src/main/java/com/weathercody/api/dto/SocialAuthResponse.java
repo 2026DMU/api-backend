@@ -5,7 +5,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 
-import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -13,57 +12,31 @@ import java.util.UUID;
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class SocialAuthResponse {
 
-    private SocialAuthAction action;
     private UUID userId;
     private String accessToken;
     private String provider;
     private String email;
     private String name;
-    // 소셜 프로필만으로 계정을 만들 수 없을 때만 추가 입력 항목을 내려줍니다.
-    private List<String> requiredFields;
+    // 소셜 로그인은 가입/로그인을 우선 완료하고,
+    // 이 값으로만 "추가 프로필 입력이 필요한지" 프론트에서 판단합니다.
+    private boolean profileCompleted;
 
-    public static SocialAuthResponse login(UUID userId, String accessToken, String provider, String email, String name) {
-        return SocialAuthResponse.builder()
-                .action(SocialAuthAction.LOGIN)
-                .userId(userId)
-                .accessToken(accessToken)
-                .provider(provider)
-                .email(email)
-                .name(name)
-                .requiredFields(List.of())
-                .build();
-    }
-
-    public static SocialAuthResponse signupRequired(
-            String provider,
-            String email,
-            String name,
-            List<String> requiredFields
-    ) {
-        return SocialAuthResponse.builder()
-                .action(SocialAuthAction.SIGNUP_REQUIRED)
-                .provider(provider)
-                .email(email)
-                .name(name)
-                .requiredFields(List.copyOf(requiredFields))
-                .build();
-    }
-
-    public static SocialAuthResponse signupCompleted(
+    public static SocialAuthResponse authenticated(
             UUID userId,
             String accessToken,
             String provider,
             String email,
-            String name
+            String name,
+            boolean profileCompleted
     ) {
+        // 기존 연동 계정 로그인과 첫 소셜 회원가입 완료 응답을 같은 형태로 맞춥니다.
         return SocialAuthResponse.builder()
-                .action(SocialAuthAction.SIGNUP_COMPLETED)
                 .userId(userId)
                 .accessToken(accessToken)
                 .provider(provider)
                 .email(email)
                 .name(name)
-                .requiredFields(List.of())
+                .profileCompleted(profileCompleted)
                 .build();
     }
 }

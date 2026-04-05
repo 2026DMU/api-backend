@@ -15,7 +15,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -85,10 +84,17 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("social auth wraps the signup-required response in ApiResponse")
+    @DisplayName("social auth wraps the response in ApiResponse")
     void socialAuth_responseIsWrappedInApiResponse() throws Exception {
         given(authService.socialAuthenticate(any())).willReturn(
-                SocialAuthResponse.signupRequired("GOOGLE", "social@example.com", "Social User", List.of("gender", "birthDate", "phone"))
+                SocialAuthResponse.authenticated(
+                        UUID.fromString("33333333-3333-3333-3333-333333333333"),
+                        "social-token",
+                        "GOOGLE",
+                        "social@example.com",
+                        "Social User",
+                        false
+                )
         );
 
         String requestBody = """
@@ -105,10 +111,11 @@ class AuthControllerTest {
                         .content(requestBody))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.statusCode").value(200))
-                .andExpect(jsonPath("$.message").value("추가 회원 정보 입력이 필요합니다."))
-                .andExpect(jsonPath("$.data.action").value("SIGNUP_REQUIRED"))
+                .andExpect(jsonPath("$.message").value("소셜 로그인이 완료되었습니다. 추가 정보는 마이페이지에서 입력해주세요."))
+                .andExpect(jsonPath("$.data.userId").value("33333333-3333-3333-3333-333333333333"))
+                .andExpect(jsonPath("$.data.accessToken").value("social-token"))
                 .andExpect(jsonPath("$.data.provider").value("GOOGLE"))
                 .andExpect(jsonPath("$.data.email").value("social@example.com"))
-                .andExpect(jsonPath("$.data.requiredFields[0]").value("gender"));
+                .andExpect(jsonPath("$.data.profileCompleted").value(false));
     }
 }

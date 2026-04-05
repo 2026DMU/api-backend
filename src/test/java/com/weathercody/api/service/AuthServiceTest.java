@@ -1,6 +1,5 @@
 package com.weathercody.api.service;
 
-import com.weathercody.api.dto.SocialAuthAction;
 import com.weathercody.api.dto.SocialAuthRequest;
 import com.weathercody.api.dto.SocialAuthResponse;
 import com.weathercody.api.entity.SocialAccount;
@@ -53,6 +52,9 @@ class AuthServiceTest {
         User user = User.builder()
                 .email("social@example.com")
                 .name("Social User")
+                .gender("F")
+                .birthDate(LocalDate.of(2000, 1, 1))
+                .phone("010-1111-2222")
                 .build();
         ReflectionTestUtils.setField(user, "id", UUID.randomUUID());
 
@@ -73,18 +75,24 @@ class AuthServiceTest {
 
         SocialAuthResponse response = authService.socialAuthenticate(request);
 
-        assertThat(response.getAction()).isEqualTo(SocialAuthAction.LOGIN);
         assertThat(response.getAccessToken()).isEqualTo("jwt-token");
         assertThat(response.getEmail()).isEqualTo("social@example.com");
+        assertThat(response.isProfileCompleted()).isTrue();
         verify(userRepository, never()).existsByEmail(any());
     }
 
     @Test
-    @DisplayName("social auth returns signup required when additional fields are missing")
-    void socialAuthenticate_returnsSignupRequiredWhenFieldsAreMissing() {
+    @DisplayName("social auth creates a user and marks profile incomplete when optional fields are missing")
+    void socialAuthenticate_createsUserWhenProfileFieldsAreMissing() {
         given(socialAccountRepository.findByProviderAndProviderUserId("GOOGLE", "google-123"))
                 .willReturn(Optional.empty());
         given(userRepository.existsByEmail("social@example.com")).willReturn(false);
+        given(jwtTokenProvider.createToken("social@example.com")).willReturn("social-token");
+        given(userRepository.save(any(User.class))).willAnswer(invocation -> {
+            User user = invocation.getArgument(0);
+            ReflectionTestUtils.setField(user, "id", UUID.fromString("22222222-2222-2222-2222-222222222222"));
+            return user;
+        });
 
         SocialAuthRequest request = new SocialAuthRequest();
         request.setProvider("GOOGLE");
@@ -94,13 +102,14 @@ class AuthServiceTest {
 
         SocialAuthResponse response = authService.socialAuthenticate(request);
 
-        assertThat(response.getAction()).isEqualTo(SocialAuthAction.SIGNUP_REQUIRED);
-        assertThat(response.getRequiredFields()).containsExactly("gender", "birthDate", "phone");
-        verify(userRepository, never()).save(any(User.class));
+        assertThat(response.getAccessToken()).isEqualTo("social-token");
+        assertThat(response.isProfileCompleted()).isFalse();
+        verify(userRepository).save(any(User.class));
+        verify(socialAccountRepository).save(any(SocialAccount.class));
     }
 
     @Test
-    @DisplayName("social auth creates a new user when required signup fields are present")
+    @DisplayName("social auth creates a new user when profile fields are complete")
     void socialAuthenticate_createsUserWhenFieldsAreComplete() {
         given(socialAccountRepository.findByProviderAndProviderUserId("KAKAO", "kakao-123"))
                 .willReturn(Optional.empty());
@@ -127,9 +136,9 @@ class AuthServiceTest {
 
         SocialAuthResponse response = authService.socialAuthenticate(request);
 
-        assertThat(response.getAction()).isEqualTo(SocialAuthAction.SIGNUP_COMPLETED);
         assertThat(response.getAccessToken()).isEqualTo("new-social-token");
         assertThat(response.getUserId()).isEqualTo(UUID.fromString("11111111-1111-1111-1111-111111111111"));
+        assertThat(response.isProfileCompleted()).isTrue();
 
         ArgumentCaptor<SocialAccount> socialAccountCaptor = ArgumentCaptor.forClass(SocialAccount.class);
         verify(socialAccountRepository).save(socialAccountCaptor.capture());

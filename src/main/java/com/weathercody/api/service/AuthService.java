@@ -16,7 +16,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -35,6 +34,17 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
 
+    // 회원가입 로그 흐름 예시:
+    //
+    // [성공]
+    // INFO  LoggingFilter - [REQUEST]  POST /api/auth/signup | body: {"email":"test@example.com","password":"[MASKED]","name":"홍길동",...}
+    // INFO  AuthService   - 회원가입 성공 - email: test@example.com
+    // INFO  LoggingFilter - [RESPONSE] 200 | 23ms | body: {"data":"UUID","statusCode":200,"message":"회원가입이 완료되었습니다."}
+    //
+    // [실패 - 중복 이메일]
+    // INFO  LoggingFilter - [REQUEST]  POST /api/auth/signup | body: {"email":"test@example.com","password":"[MASKED]","name":"홍길동",...}
+    // WARN  AuthService   - 회원가입 실패 - 이미 존재하는 이메일: test@example.com
+    // INFO  LoggingFilter - [RESPONSE] 500 | 12ms | body: ...
     @Transactional
     public UUID signup(SignupRequest request) {
         if (request.getPassword() == null || request.getPassword().isBlank()) {
@@ -42,7 +52,7 @@ public class AuthService {
         }
 
         if (userRepository.existsByEmail(request.getEmail())) {
-            log.warn("회원가입 실패 - 이미 존재하는 이메일 {}", request.getEmail());
+            log.warn("회원가입 실패 - 이미 존재하는 이메일: {}", request.getEmail());
             throw new RuntimeException("이미 존재하는 이메일입니다.");
         }
 
@@ -70,7 +80,7 @@ public class AuthService {
 
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> {
-                    log.warn("로그인 실패 - 가입되지 않은 이메일 {}", request.getEmail());
+                    log.warn("로그인 실패 - 가입되지 않은 이메일: {}", request.getEmail());
                     return new RuntimeException("가입되지 않은 이메일입니다.");
                 });
 
@@ -80,7 +90,7 @@ public class AuthService {
         }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            log.warn("로그인 실패 - 비밀번호 불일치 {}", request.getEmail());
+            log.warn("로그인 실패 - 비밀번호 불일치: {}", request.getEmail());
             throw new RuntimeException("비밀번호가 일치하지 않습니다.");
         }
 
@@ -102,14 +112,17 @@ public class AuthService {
                 socialAccountRepository.findByProviderAndProviderUserId(provider, providerUserId);
         if (existingSocialAccount.isPresent()) {
             // 이미 연동된 소셜 계정이면 바로 JWT를 발급하고 로그인 처리를 끝냅니다.
+            // 이 경우에는 추가 정보 입력 여부와 상관없이 로그인은 성공시키고,
+            // profileCompleted 값으로만 이후 보완 유도를 판단합니다.
             User user = existingSocialAccount.get().getUser();
             log.info("소셜 로그인 성공 - provider: {}, email: {}", provider, user.getEmail());
-            return SocialAuthResponse.login(
+            return SocialAuthResponse.authenticated(
                     user.getId(),
                     jwtTokenProvider.createToken(user.getEmail()),
                     provider,
                     user.getEmail(),
-                    user.getName()
+                    user.getName(),
+                    isProfileCompleted(user)
             );
         }
 
@@ -117,15 +130,16 @@ public class AuthService {
         String name = trimToNull(request.getName());
 
         if (email != null && userRepository.existsByEmail(email)) {
-            log.warn("소셜 로그인 실패 - 이미 가입된 이메일 {}", email);
+            // 문서 기준으로는 기존 이메일 계정을 자동 연동하지 않습니다.
+            // 사용자가 이미 이메일 회원가입을 했다면 기존 로그인 경로를 안내합니다.
+            log.warn("소셜 로그인 실패 - 이미 가입된 이메일: {}", email);
             throw new RuntimeException("이미 가입된 이메일입니다. 기존 로그인을 이용해주세요.");
         }
 
-        List<String> missingFields = getMissingSignupFields(request);
-        if (!missingFields.isEmpty()) {
-            // 앱은 이 목록을 보고 추가 정보 입력 화면에서 무엇을 더 받아야 하는지 결정합니다.
-            log.info("소셜 회원가입 추가 정보 필요 - provider: {}, providerUserId: {}", provider, providerUserId);
-            return SocialAuthResponse.signupRequired(provider, email, name, missingFields);
+        if (email == null || name == null) {
+            // 이메일과 이름은 우리 서비스 계정을 생성하는 최소 기준 정보입니다.
+            // 소셜 제공자에서 이 값조차 내려주지 않으면 회원 생성 자체를 진행할 수 없습니다.
+            throw new IllegalArgumentException("소셜 회원가입에 필요한 기본 정보가 부족합니다.");
         }
 
         String phone = trimToNull(request.getPhone());
@@ -155,13 +169,17 @@ public class AuthService {
                 .email(user.getEmail())
                 .build());
 
+        // 첫 소셜 로그인도 가능한 한 즉시 회원가입 + 로그인까지 완료합니다.
+        // 부족한 프로필 정보는 profileCompleted=false 로 내려서
+        // 메인 진입 후 마이페이지에서 보완하도록 유도합니다.
         log.info("소셜 회원가입 성공 - provider: {}, email: {}", provider, user.getEmail());
-        return SocialAuthResponse.signupCompleted(
+        return SocialAuthResponse.authenticated(
                 user.getId(),
                 jwtTokenProvider.createToken(user.getEmail()),
                 provider,
                 user.getEmail(),
-                user.getName()
+                user.getName(),
+                isProfileCompleted(user)
         );
     }
 
@@ -179,27 +197,12 @@ public class AuthService {
         return normalizedProvider;
     }
 
-    private List<String> getMissingSignupFields(SocialAuthRequest request) {
-        // 현재 앱 회원가입 화면 기준으로 필수 입력으로 보는 항목들입니다.
-        List<String> missingFields = new ArrayList<>();
-
-        if (trimToNull(request.getEmail()) == null) {
-            missingFields.add("email");
-        }
-        if (trimToNull(request.getName()) == null) {
-            missingFields.add("name");
-        }
-        if (trimToNull(request.getGender()) == null) {
-            missingFields.add("gender");
-        }
-        if (request.getBirthDate() == null) {
-            missingFields.add("birthDate");
-        }
-        if (trimToNull(request.getPhone()) == null) {
-            missingFields.add("phone");
-        }
-
-        return missingFields;
+    private boolean isProfileCompleted(User user) {
+        // 현재 기준으로는 가입 후 반드시 보완을 유도할 핵심 항목만 체크합니다.
+        // 키/몸무게/발 사이즈는 추천 품질에는 중요하지만, 로그인 차단 조건으로는 보지 않습니다.
+        return trimToNull(user.getGender()) != null
+                && user.getBirthDate() != null
+                && trimToNull(user.getPhone()) != null;
     }
 
     private String trimToNull(String value) {
